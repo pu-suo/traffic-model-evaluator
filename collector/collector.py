@@ -13,8 +13,8 @@ import math
 
 # --- Configuration ---
 # Secrets will be fetched primarily from environment, fallback to AWS Secrets Manager
-SECRET_NAME_HERE_API = "HereTrafficApiKeyMvp"
-SECRET_NAME_DB_CREDS = "HereTrafficDbCredentialsMvp"
+SECRET_NAME_HERE_API = "HereTrafficApiKey"
+SECRET_NAME_DB_CREDS = "HereTrafficDbCredentials"
 AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-1"))
 
 MAPPING_FILE_PATH = 'pems_here_mapping.csv'
