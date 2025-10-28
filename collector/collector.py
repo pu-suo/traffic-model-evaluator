@@ -15,7 +15,7 @@ import math
 # Secrets will be fetched primarily from environment, fallback to AWS Secrets Manager
 SECRET_NAME_HERE_API = "HereTrafficApiKey"
 SECRET_NAME_DB_CREDS = "HereTrafficDbCredentials"
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-1"))
+AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-2"))
 
 MAPPING_FILE_PATH = 'pems_here_mapping.csv'
 HERE_FLOW_URL = "https://data.traffic.hereapi.com/v7/flow"
