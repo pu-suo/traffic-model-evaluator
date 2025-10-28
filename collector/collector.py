@@ -382,7 +382,7 @@ def collect_and_store_data():
         speed_mph = None
 
         if segment_flow:
-            speed_mps = segment_flow.get('SU') # Speed Uncapped in m/s (short code for speedUncapped)
+            speed_mps = segment_flow.get('speedUncapped') # Speed Uncapped in m/s
             
             if speed_mps is not None:
                 try:
@@ -395,10 +395,10 @@ def collect_and_store_data():
                         logging.warning(f"Negative uncapped speed ({speed_mps} m/s) for PeMS:{pems_id} (HERE:{here_loc_id}/{here_q_dir}). Storing NULL.")
                         missing_speed_count += 1
                 except (ValueError, TypeError):
-                     logging.debug(f"Non-numeric SU for PeMS:{pems_id} ({here_loc_id}/{here_q_dir}): {speed_mps}")
+                     logging.debug(f"Non-numeric speedUncapped for PeMS:{pems_id} ({here_loc_id}/{here_q_dir}): {speed_mps}")
                      missing_speed_count += 1
             else: 
-                missing_speed_count += 1 # 'SU' key missing from segment_flow
+                missing_speed_count += 1 # 'speedUncapped' key missing from segment_flow
         else: 
             missing_segment_data_count += 1 # Segment data missing
 
