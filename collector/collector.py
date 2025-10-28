@@ -260,17 +260,29 @@ def fetch_here_flow_data(location_ids, api_key, bbox):
                 resp.raise_for_status()
                 data = resp.json()
                 results = data.get("results", [])
+                
+                #DEBUGGING
+                if results: # If we got any results at all
+                    logging.info("--- DEBUG: FIRST RESULT FROM API ---")
+                    logging.info(json.dumps(results[0], indent=2))
+                    logging.info("--- END DEBUG ---")
 
                 processed_in_chunk = 0
                 for segment_data in results:
                     loc = segment_data.get("location")
                     current_flow = segment_data.get("currentFlow")
-                    if loc and current_flow:
-                        loc_id = loc.get("locationId")
-                        if loc_id:
+                    tmc_info = loc.get("tmc") if loc else None # Get the 'tmc' sub-object
+                    
+                    if tmc_info and current_flow:
+                        tmc_loc_id = tmc_info.get("locationId") # <-- GET TMC ID
+                        
+                        if tmc_loc_id:
+                           # Convert API's integer ID to string to match our list
+                           tmc_loc_id_str = str(tmc_loc_id) 
+                           
                            # Only store data for IDs we actually requested in this chunk
-                           if loc_id in chunk_ids:
-                               all_flow_data[loc_id] = current_flow
+                           if tmc_loc_id_str in chunk_ids:
+                               all_flow_data[tmc_loc_id_str] = current_flow
                                processed_in_chunk += 1
                            # else: logging.debug(f"Ignoring segment {loc_id} not in requested chunk.")
                         # else: logging.debug("Segment data missing locationId.")
