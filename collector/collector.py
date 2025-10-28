@@ -245,6 +245,7 @@ def fetch_here_flow_data(location_ids, api_key, bbox):
             "in": bbox, # Mandatory spatial filter
             "locationIds": ",".join(chunk_ids), # Specific IDs to retrieve within bbox
             "locationReferencing": "tmc",
+            "functionalClasses": "1,2,3,4,5",
             "apiKey": api_key
         }
         retries = 3
@@ -369,25 +370,25 @@ def collect_and_store_data():
         speed_mph = None
 
         if segment_flow:
-            direction_flow = segment_flow.get(here_q_dir)
-            if direction_flow:
-                speed_mps = direction_flow.get('SU') # Speed Uncapped in m/s
-                if speed_mps is not None:
-                    try:
-                        speed_float_mps = float(speed_mps)
-                        if speed_float_mps >= 0:
-                            speed_mph = speed_float_mps * METERS_PER_SECOND_TO_MPH
-                            processed_sensors_count += 1
-                        else:
-                            # Log negative speed but store NULL
-                            logging.warning(f"Negative uncapped speed ({speed_mps} m/s) for PeMS:{pems_id} (HERE:{here_loc_id}/{here_q_dir}). Storing NULL.")
-                            missing_speed_count += 1
-                    except (ValueError, TypeError):
-                         logging.debug(f"Non-numeric SU for PeMS:{pems_id} ({here_loc_id}/{here_q_dir}): {speed_mps}")
-                         missing_speed_count += 1
-                else: missing_speed_count += 1 # 'SU' key missing
-            else: missing_speed_count += 1 # Queuing direction missing
-        else: missing_segment_data_count += 1 # Segment data missing
+            speed_mps = segment_flow.get('SU') # Speed Uncapped in m/s (short code for speedUncapped)
+            
+            if speed_mps is not None:
+                try:
+                    speed_float_mps = float(speed_mps)
+                    if speed_float_mps >= 0:
+                        speed_mph = speed_float_mps * METERS_PER_SECOND_TO_MPH
+                        processed_sensors_count += 1
+                    else:
+                        # Log negative speed but store NULL
+                        logging.warning(f"Negative uncapped speed ({speed_mps} m/s) for PeMS:{pems_id} (HERE:{here_loc_id}/{here_q_dir}). Storing NULL.")
+                        missing_speed_count += 1
+                except (ValueError, TypeError):
+                     logging.debug(f"Non-numeric SU for PeMS:{pems_id} ({here_loc_id}/{here_q_dir}): {speed_mps}")
+                     missing_speed_count += 1
+            else: 
+                missing_speed_count += 1 # 'SU' key missing from segment_flow
+        else: 
+            missing_segment_data_count += 1 # Segment data missing
 
         records_to_insert.append({
             'ts': current_timestamp,
