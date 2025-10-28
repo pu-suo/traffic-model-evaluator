@@ -1,0 +1,145 @@
+/* evaluation_service/static/style.css */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    line-height: 1.6;
+    padding: 20px;
+    max-width: 900px;
+    margin: 20px auto;
+    background-color: #f9f9f9;
+    color: #333;
+}
+
+h1, h2, h3, h4 {
+    color: #2c3e50;
+}
+
+h1 {
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+form div {
+    margin-bottom: 15px;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 5px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #555;
+}
+
+input[type="datetime-local"],
+select,
+input[type="number"] {
+    width: calc(100% - 16px); /* Adjust for padding */
+    padding: 8px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Include padding in width */
+    font-size: 0.95em;
+}
+
+small {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.85em;
+    color: #777;
+}
+
+button[type="submit"] {
+    background-color: #3498db;
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1em;
+    margin-top: 20px;
+    transition: background-color 0.2s ease;
+}
+
+button[type="submit"]:hover {
+    background-color: #2980b9;
+}
+
+#loading {
+    display: none; /* Hidden by default */
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #eaf2f8;
+    border: 1px solid #b3d1e6;
+    border-radius: 5px;
+    color: #31708f;
+    text-align: center;
+}
+
+#results {
+    margin-top: 30px;
+    border-top: 2px solid #3498db;
+    padding-top: 20px;
+}
+
+#resultsContent p:first-child {
+    margin-top: 0;
+}
+
+.error {
+    color: #e74c3c;
+    font-weight: bold;
+    background-color: #fbeae5;
+    padding: 10px;
+    border: 1px solid #e74c3c;
+    border-radius: 4px;
+}
+
+pre {
+    background-color: #ecf0f1;
+    padding: 15px;
+    border-radius: 5px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #bdc3c7;
+    font-family: monospace;
+}
+
+.sensor-details-container {
+    max-height: 500px; /* Limit height */
+    overflow-y: auto; /* Add scrollbar */
+    border: 1px solid #eee;
+    padding: 10px;
+    margin-top: 15px;
+    background-color: #fff;
+    border-radius: 5px;
+}
+
+.sensor-result {
+    margin-bottom: 15px;
+    border-bottom: 1px dashed #eee;
+    padding-bottom: 10px;
+}
+.sensor-result:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+
+.sensor-result h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #2980b9;
+}
+
+.metrics {
+    font-size: 0.9em;
+    color: #555;
+    margin-top: 5px;
+}

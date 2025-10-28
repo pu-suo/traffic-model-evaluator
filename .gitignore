@@ -1,0 +1,106 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class$
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Environments
+.env* # Ignore .env and .env.* files
+!.env.example # Allow example env file if you create one
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE / Editor specific
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Notebook Checkpoints
+.ipynb_checkpoints
+
+# Logs
+*.log
+logs/
+log/
+collector/*.log
+
+# Data and Model files (NEVER commit these)
+*.h5
+*.csv
+*.pkl
+*.pth
+*.pt
+*.npz
+
+# Explicitly ignore mapping outputs and sensitive inputs
+mapping/*.csv
+mapping/*.png
+mapping/PEMS-BAY-META.csv
+!mapping/.gitkeep # Keep the placeholder if present
+!mapping/requirements-mapping.txt # DO NOT IGNORE requirements
+
+# Ignore data/model files if placed in services later
+model/*.pth
+!model/.gitkeep
+
+collector/*.csv
+!collector/requirements.txt # DO NOT IGNORE requirements
+
+# AWS / Terraform / CloudFormation state/credentials
+.terraform/
+terraform.tfstate*
+*.tfvars
+.aws/
+
+

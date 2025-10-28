@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Forecast Evaluation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <h1>Traffic Forecast Evaluation (MVP)</h1>
+    <p>Select parameters to evaluate a forecasting model against historical data collected from the HERE API. Evaluation is performed for all available sensors.</p>
+
+    <form id="evalForm">
+        <div>
+            <label for="prediction_start_time">Prediction Start Time (Local):</label>
+            <input type="datetime-local" id="prediction_start_time" name="prediction_start_time" required step="300"> <small>Your local time. Will be converted to UTC for processing.</small>
+        </div>
+
+        <div>
+            <label for="lookback_minutes">Lookback Period (minutes):</label>
+            <input type="number" id="lookback_minutes" name="lookback_minutes" value="60" min="15" max="10080" step="5" required>
+            <small>Range: 15 - 10080 (7 days)</small>
+        </div>
+
+        <div>
+            <label for="horizon_minutes">Prediction Horizon (minutes):</label>
+            <input type="number" id="horizon_minutes" name="horizon_minutes" value="30" min="5" max="180" step="5" required>
+            <small>Range: 5 - 180 (3 hours)</small>
+        </div>
+
+        <div>
+            <label for="model_type">Model Type:</label>
+            <select id="model_type" name="model_type" required>
+                <option value="HA">Historical Average (HA)</option>
+                <option value="ARIMA">ARIMA</option>
+                </select>
+        </div>
+
+        <button type="submit">Evaluate Model</button>
+    </form>
+
+    <div id="loading">Evaluating... Please wait. This may take a minute.</div>
+    <div id="results">
+        <h2>Results</h2>
+        <div id="resultsContent"><p>Enter parameters above and click "Evaluate Model".</p></div>
+    </div>
+
+    <script>
+        const form = document.getElementById('evalForm');
+        const resultsContentDiv = document.getElementById('resultsContent');
+        const loadingDiv = document.getElementById('loading');
+
+        // --- Helper Function to Format Results ---
+        function displayResults(resultData) {
+            resultsContentDiv.innerHTML = ''; // Clear previous
+
+            if (!resultData || typeof resultData !== 'object') {
+                 resultsContentDiv.innerHTML = '<p class="error">Invalid response format received from server.</p>';
+                 return;
+            }
+            if (resultData.error) {
+                 resultsContentDiv.innerHTML = `<p class="error">Error: ${resultData.error}</p>`;
+                 return;
+            }
+
+            // --- Display Overall Metrics ---
+            const overall = resultData.overall_metrics;
+            let overallHtml = '<h3>Overall Metrics</h3>';
+            if (overall && overall.total_points_compared > 0) {
+                overallHtml += `<p>
+                    Avg MAE: ${overall.mae !== null ? overall.mae.toFixed(2) : 'N/A'} |
+                    Avg RMSE: ${overall.rmse !== null ? overall.rmse.toFixed(2) : 'N/A'} |
+                    Avg Bias: ${overall.bias !== null ? overall.bias.toFixed(2) : 'N/A'} <br>
+                    <small>(Based on ${overall.total_points_compared} comparison points across ${overall.sensors_with_results} / ${overall.sensors_evaluated} sensors)</small>
+                </p>`;
+            } else {
+                overallHtml += '<p>N/A (No comparable points found across sensors or calculation failed)</p>';
+            }
+            resultsContentDiv.innerHTML += overallHtml;
+
+            // --- Display Per-Sensor Details (Optional - could be a lot) ---
+            const perSensor = resultData.per_sensor_results;
+            let sensorHtml = '<h3>Per-Sensor Metrics (Top 20)</h3>'; // Limit display initially
+            let sensorCount = 0;
+            if (perSensor) {
+                sensorHtml += '<div class="sensor-details-container">';
+                for (const sensorId in perSensor) {
+                    if (sensorCount >= 20) {
+                         sensorHtml += '<p><i>... (results for remaining sensors hidden) ...</i></p>';
+                         break; // Stop after 20 sensors for brevity
+                    }
+                    if (perSensor.hasOwnProperty(sensorId)) {
+                        const data = perSensor[sensorId];
+                        const metrics = data.metrics;
+                        sensorHtml += `<div class="sensor-result"><h4>Sensor: ${sensorId}</h4>`;
+                        if (metrics && metrics.count > 0) {
+                            sensorHtml += `<p class="metrics">
+                                MAE: ${metrics.mae !== null ? metrics.mae.toFixed(2) : 'N/A'} |
+                                RMSE: ${metrics.rmse !== null ? metrics.rmse.toFixed(2) : 'N/A'} |
+                                Bias: ${metrics.bias !== null ? metrics.bias.toFixed(2) : 'N/A'}
+                                (Points: ${metrics.count})
+                            </p>`;
+                        } else {
+                            sensorHtml += `<p class="metrics">Metrics: N/A</p>`;
+                        }
+                        // Optionally add expandable sections for prediction/truth lists
+                        sensorHtml += `</div>`;
+                        sensorCount++;
+                    }
+                }
+                 sensorHtml += '</div>'; // End container
+            } else {
+                 sensorHtml += '<p>No per-sensor results available.</p>';
+            }
+             resultsContentDiv.innerHTML += sensorHtml;
+
+             // Optionally add raw JSON output
+             // resultsContentDiv.innerHTML += '<h3>Raw JSON Response</h3>';
+             // resultsContentDiv.innerHTML += `<pre>${JSON.stringify(resultData, null, 2)}</pre>`;
+        }
+
+
+        // --- Set Default Start Time ---
+        function setDefaultTime() {
+            const now = new Date();
+            // Go back 1 hour and floor to the nearest 5-minute interval
+            const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
+            const minutesRemainder = oneHourAgo.getMinutes() % 5;
+            oneHourAgo.setMinutes(oneHourAgo.getMinutes() - minutesRemainder);
+            oneHourAgo.setSeconds(0);
+            oneHourAgo.setMilliseconds(0);
+
+            // Format for datetime-local input (YYYY-MM-DDTHH:MM) - Needs local time
+            const year = oneHourAgo.getFullYear();
+            const month = (oneHourAgo.getMonth() + 1).toString().padStart(2, '0');
+            const day = oneHourAgo.getDate().toString().padStart(2, '0');
+            const hours = oneHourAgo.getHours().toString().padStart(2, '0');
+            const minutes = oneHourAgo.getMinutes().toString().padStart(2, '0');
+            const localTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
+
+            const startTimeInput = document.getElementById('prediction_start_time');
+            if (startTimeInput) {
+                startTimeInput.value = localTimeString;
+                console.log("Default start time set to:", localTimeString);
+            } else {
+                 console.error("Could not find start time input element");
+            }
+        }
+
+        // --- Form Submission Handler ---
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            resultsContentDiv.innerHTML = '<p>Processing request...</p>';
+            loadingDiv.style.display = 'block';
+
+            const formData = new FormData(form);
+            const startTimeLocal = formData.get('prediction_start_time'); // "YYYY-MM-DDTHH:MM" (local)
+            const lookback = parseInt(formData.get('lookback_minutes'), 10);
+            const horizon = parseInt(formData.get('horizon_minutes'), 10);
+            const model = formData.get('model_type');
+
+            // Convert local datetime-local to ISO UTC string (YYYY-MM-DDTHH:MM:SSZ)
+            // It's crucial the backend expects UTC if JS converts it here.
+            // If backend converts from local, just send startTimeLocal.
+            // Let's assume backend converts from local string, so send as is but maybe add Z? No, backend expects local.
+            // ****** ADJUSTMENT: Send the local time string directly, let backend handle localization ******
+             const startTimeToSend = startTimeLocal; // Send the string "YYYY-MM-DDTHH:MM"
+
+            // Construct payload WITHOUT sensor_ids
+            const payload = {
+                prediction_start_time_iso: startTimeToSend + ":00Z", // Add seconds and Z to make it valid ISO *if* backend needs full ISO UTC
+                // OR send exactly as startTimeLocal if backend expects local string and localizes itself. Let's assume backend localizes.
+                // prediction_start_time_iso: startTimeLocal,
+                lookback_minutes: lookback,
+                horizon_minutes: horizon,
+                model_type: model
+                // NO sensor_ids here
+            };
+            console.log("Sending payload:", payload);
+
+
+            try {
+                const response = await fetch('/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                const result = await response.json();
+                console.log("Received response:", result);
+
+                loadingDiv.style.display = 'none';
+                displayResults(result); // Call helper to render results
+
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                console.error('Fetch error:', error);
+                resultsContentDiv.innerHTML = `<p class="error">Client-side error: ${error.message}. Check browser console and network tab.</p>`;
+            }
+        });
+
+        // Set default time when the page loads
+        document.addEventListener('DOMContentLoaded', setDefaultTime);
+
+    </script>
+
+</body>
+</html>

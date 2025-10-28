@@ -1,0 +1,11 @@
+# evaluation_service/requirements.txt
+Flask>=2.0.0
+pandas>=1.3.0
+SQLAlchemy>=1.4.0
+psycopg2-binary>=2.9.0
+statsmodels>=0.13.0
+scikit-learn>=1.0.0
+boto3>=1.18.0
+numpy>=1.20.0
+gunicorn>=20.1.0
+python-dotenv>=0.19.0 # Useful for potentially loading local .env for testing
