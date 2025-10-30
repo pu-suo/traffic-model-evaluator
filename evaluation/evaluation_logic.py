@@ -14,7 +14,7 @@ import math
 # --- Configuration ---
 SECRET_NAME_DB_CREDS = "HereTrafficDbCredentials" # Must match name used in AWS setup
 # Attempt to get region from standard environment variables, fallback if needed
-AWS_REGION = "us-east-2"
+AWS_REGION = "us-east-2"))
 DEFAULT_ARIMA_ORDER = (1, 1, 0) # Default (p,d,q) order for ARIMA
 DATA_FREQUENCY = '5min' # Expected frequency of data in the database
 COLLECTION_INTERVAL_MINUTES = 5
@@ -146,7 +146,7 @@ def get_secret_from_aws(secret_name, region_name=AWS_REGION):
             logging.warning(f"Secret '{secret_name}' from AWS SM might be binary.")
             return None
     except client.exceptions.ResourceNotFoundException:
-        logging.error(f"Secret '{secret_name}' not found in AWS Secrets Manager region {region_name}. Ensure name is correct ('{SECRET_NAME_HERE_API}', '{SECRET_NAME_DB_CREDS}') and exists.")
+        logging.error(f"Secret '{secret_name}' not found in AWS Secrets Manager region {region_name}. Ensure name is correct ('{SECRET_NAME_DB_CREDS}') and exists.")
         return None
     except Exception as e:
         logging.error(f"Failed to retrieve secret '{secret_name}' from AWS SM: {e}", exc_info=False)
