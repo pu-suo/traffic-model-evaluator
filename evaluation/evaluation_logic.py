@@ -120,6 +120,37 @@ def connect_db():
             return None
     return db_engine
 
+def get_secret_from_aws(secret_name, region_name=AWS_REGION):
+    """Retrieves secret value ONLY from AWS Secrets Manager."""
+    if secret_name in secrets_cache: return secrets_cache[secret_name]
+
+    logging.info(f"Attempting to retrieve secret from AWS Secrets Manager: {secret_name} in {region_name}")
+    # Use default session which should pick up IAM role credentials on EC2
+    session = boto3.session.Session()
+    client = session.client(service_name='secretsmanager', region_name=region_name)
+
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+        logging.info(f"Successfully retrieved secret from AWS SM: {secret_name}")
+        # ...(rest of parsing logic - unchanged)...
+        if 'SecretString' in get_secret_value_response:
+            secret = get_secret_value_response['SecretString']
+            try: # Try parsing as JSON
+                parsed_secret = json.loads(secret)
+                secrets_cache[secret_name] = parsed_secret
+                return parsed_secret
+            except json.JSONDecodeError: # Fallback to plain string
+                secrets_cache[secret_name] = secret
+                return secret
+        else:
+            logging.warning(f"Secret '{secret_name}' from AWS SM might be binary.")
+            return None
+    except client.exceptions.ResourceNotFoundException:
+        logging.error(f"Secret '{secret_name}' not found in AWS Secrets Manager region {region_name}. Ensure name is correct ('{SECRET_NAME_HERE_API}', '{SECRET_NAME_DB_CREDS}') and exists.")
+        return None
+    except Exception as e:
+        logging.error(f"Failed to retrieve secret '{secret_name}' from AWS SM: {e}", exc_info=False)
+        return None
 
 # --- Forecasting Models ---
 def predict_historical_average(series, horizon_steps):
