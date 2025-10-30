@@ -254,13 +254,13 @@ def evaluate_forecast(prediction_start_time_iso, horizon_minutes, lookback_minut
 
         # Pivot history - crucial step
         # Create a full date range for the history period to ensure gaps are NaNs
-        hist_index = pd.date_range(start=history_start_time_utc, end=prediction_start_time_utc, freq=DATA_FREQUENCY, closed='left', tz='UTC')
+        hist_index = pd.date_range(start=history_start_time_utc, end=prediction_start_time_utc, freq=DATA_FREQUENCY, inclusive='left', tz='UTC')
         hist_pivot = hist_df.pivot(index='ts', columns='sensor_id', values='actual_speed')
         # Reindex to ensure all time steps and sensors are present, filling missing data with NaN
         hist_pivot = hist_pivot.reindex(index=hist_index, columns=sensor_ids_to_evaluate)
 
         # Pivot truth similarly for easy lookup
-        truth_index = pd.date_range(start=prediction_start_time_utc, end=horizon_end_time_utc, freq=DATA_FREQUENCY, closed='left', tz='UTC')
+        truth_index = pd.date_range(start=prediction_start_time_utc, end=horizon_end_time_utc, freq=DATA_FREQUENCY, inclusive='left', tz='UTC')
         truth_pivot = truth_df.pivot(index='ts', columns='sensor_id', values='actual_speed')
         truth_pivot = truth_pivot.reindex(index=truth_index, columns=sensor_ids_to_evaluate)
 
