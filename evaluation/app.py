@@ -6,13 +6,15 @@ from datetime import datetime, timezone, timedelta
 
 # Import the core logic function
 try:
-    from evaluation_logic import evaluate_forecast, connect_db
-except ImportError:
-    logging.critical("Could not import evaluation_logic. Ensure evaluation_logic.py is in the same directory.")
-    # Define dummy function if import fails to allow Flask to start partially
+    from .evaluation_logic import evaluate_forecast, connect_db
+except ImportError as e:
+    logging.critical(f"Could not import evaluation_logic: {e}. Ensure evaluation_logic.py is in the same directory.")
+    # Define dummy functions if import fails to allow Flask to start
     def evaluate_forecast(*args, **kwargs):
-        return {"error": "Evaluation logic module not found or failed to import."}
-    def connect_db(): return None
+        return {"error": "CRITICAL: Evaluation logic module failed to import. Check server logs."}
+    def connect_db():
+        logging.error("CRITICAL: connect_db function not loaded.")
+        return None
 
 # --- Flask App Setup ---
 app = Flask(__name__)
