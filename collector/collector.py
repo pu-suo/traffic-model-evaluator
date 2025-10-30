@@ -152,12 +152,11 @@ def load_mapping(filepath=MAPPING_FILE_PATH):
         return False
 
 # --- Database Connection ---
-# (connect_db function remains the same - uses ENV first, then AWS Secrets)
 def connect_db():
     """Establishes or verifies the database connection using SQLAlchemy."""
     global db_engine
     if db_engine is not None:
-        try: # Quick check
+        try:
              with db_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
                  connection.execute(sqlalchemy.text("SELECT 1"))
              return db_engine
@@ -169,37 +168,26 @@ def connect_db():
              db_engine = None
 
     if db_engine is None:
-        logging.info("Attempting to establish database connection...")
-        # Try environment variables first
-        db_user_env = os.environ.get("POSTGRES_USER")
-        db_pass_env = os.environ.get("POSTGRES_PASSWORD")
-        db_host_env = os.environ.get("DB_HOST", "database")
-        db_port_env = os.environ.get("DB_PORT", 5432)
-        db_name_env = os.environ.get("POSTGRES_DB")
+        logging.info("Attempting to establish database connection using AWS Secrets Manager...")
         DATABASE_URL = None
+        
+        db_creds = get_secret_from_aws(SECRET_NAME_DB_CREDS)
+        if not isinstance(db_creds, dict):
+            logging.error(f"Failed to retrieve/parse DB credentials secret '{SECRET_NAME_DB_CREDS}' from AWS SM.")
+            return None
 
-        if all([db_user_env, db_pass_env, db_host_env, db_name_env]):
-            logging.info(f"Using DB credentials from environment variables (Host: {db_host_env})")
-            DATABASE_URL = f"postgresql+psycopg2://{db_user_env}:{db_pass_env}@{db_host_env}:{db_port_env}/{db_name_env}"
-        else:
-            # Fallback to AWS Secrets Manager
-            logging.info("DB environment variables not fully set, attempting AWS Secrets Manager...")
-            db_creds = get_secret_from_aws(SECRET_NAME_DB_CREDS)
-            if not isinstance(db_creds, dict):
-                logging.error("Failed to retrieve/parse DB credentials secret from AWS SM.")
-                return None
+        db_user = db_creds.get('username')
+        db_pass = db_creds.get('password')
+        db_host = db_creds.get('host')
+        db_port = db_creds.get('port', 5432)
+        db_name = db_creds.get('dbname')
 
-            db_user = db_creds.get('username')
-            db_pass = db_creds.get('password')
-            db_host = db_creds.get('host')
-            db_port = db_creds.get('port', 5432)
-            db_name = db_creds.get('dbname')
-
-            if not all([db_user, db_pass, db_host, db_name]):
-                logging.error("DB credentials incomplete in AWS secret.")
-                return None
-            DATABASE_URL = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-            logging.info(f"Using DB credentials from AWS Secrets Manager (Host: {db_host})")
+        if not all([db_user, db_pass, db_host, db_name]):
+            logging.error("DB credentials incomplete in AWS secret. Ensure 'username', 'password', 'host', and 'dbname' are set.")
+            return None
+            
+        DATABASE_URL = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+        logging.info(f"Using DB credentials from AWS Secrets Manager (Host: {db_host})")
 
         if DATABASE_URL:
             try:
@@ -215,8 +203,8 @@ def connect_db():
                 db_engine = None
                 return None
         else:
-             logging.error("Could not determine database connection string.")
-             return None
+            logging.error("Could not determine database connection string.")
+            return None
     return db_engine
 
 

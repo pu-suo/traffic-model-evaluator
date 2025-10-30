@@ -17,6 +17,7 @@ SECRET_NAME_DB_CREDS = "HereTrafficDbCredentials" # Must match name used in AWS 
 AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-2"))
 DEFAULT_ARIMA_ORDER = (1, 1, 0) # Default (p,d,q) order for ARIMA
 DATA_FREQUENCY = '5min' # Expected frequency of data in the database
+COLLECTION_INTERVAL_MINUTES = 5
 
 # --- Logging Setup ---
 # Basic configuration, Flask app might override this later
@@ -63,53 +64,43 @@ def get_secret(secret_name, region_name=AWS_REGION):
         return None
 
 # --- Database Connection ---
+# --- Database Connection ---
 def connect_db():
     """Establishes or verifies the database connection using SQLAlchemy."""
     global db_engine
     if db_engine is not None:
-        try: # Quick check
+        try:
              with db_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
                  connection.execute(sqlalchemy.text("SELECT 1"))
              return db_engine
         except sqlalchemy.exc.OperationalError:
-             logger.warning("DB connection test failed, attempting reconnect...")
+             logging.warning("DB connection test failed, attempting reconnect...")
              db_engine = None
         except Exception as e:
-             logger.error(f"Unexpected error testing DB connection: {e}", exc_info=False)
+             logging.error(f"Unexpected error testing DB connection: {e}", exc_info=False)
              db_engine = None
 
     if db_engine is None:
-        logger.info("Attempting to establish new database connection...")
-        # Try environment variables first (useful for local testing with .env)
-        db_user_env = os.environ.get("DB_USER") # Use DB_USER/PASS/HOST/PORT/NAME
-        db_pass_env = os.environ.get("DB_PASSWORD")
-        db_host_env = os.environ.get("DB_HOST")
-        db_port_env = os.environ.get("DB_PORT", 5432)
-        db_name_env = os.environ.get("DB_NAME")
+        logging.info("Attempting to establish database connection using AWS Secrets Manager...")
         DATABASE_URL = None
+        
+        db_creds = get_secret_from_aws(SECRET_NAME_DB_CREDS)
+        if not isinstance(db_creds, dict):
+            logging.error(f"Failed to retrieve/parse DB credentials secret '{SECRET_NAME_DB_CREDS}' from AWS SM.")
+            return None
 
-        if all([db_user_env, db_pass_env, db_host_env, db_name_env]):
-            logger.info(f"Using DB credentials from environment variables (Host: {db_host_env})")
-            DATABASE_URL = f"postgresql+psycopg2://{db_user_env}:{db_pass_env}@{db_host_env}:{db_port_env}/{db_name_env}"
-        else:
-            # Fallback to AWS Secrets Manager
-            logger.info("DB environment variables not fully set, attempting AWS Secrets Manager...")
-            db_creds = get_secret(SECRET_NAME_DB_CREDS)
-            if not isinstance(db_creds, dict):
-                logger.error("Failed to retrieve/parse DB credentials secret from AWS SM.")
-                return None
+        db_user = db_creds.get('username')
+        db_pass = db_creds.get('password')
+        db_host = db_creds.get('host')
+        db_port = db_creds.get('port', 5432)
+        db_name = db_creds.get('dbname')
 
-            db_user = db_creds.get('username')
-            db_pass = db_creds.get('password')
-            db_host = db_creds.get('host')
-            db_port = db_creds.get('port', 5432)
-            db_name = db_creds.get('dbname')
-
-            if not all([db_user, db_pass, db_host, db_name]):
-                logger.error("DB credentials incomplete in AWS secret.")
-                return None
-            DATABASE_URL = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
-            logger.info(f"Using DB credentials from AWS Secrets Manager (Host: {db_host})")
+        if not all([db_user, db_pass, db_host, db_name]):
+            logging.error("DB credentials incomplete in AWS secret. Ensure 'username', 'password', 'host', and 'dbname' are set.")
+            return None
+            
+        DATABASE_URL = f"postgresql+psycopg2://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
+        logging.info(f"Using DB credentials from AWS Secrets Manager (Host: {db_host})")
 
         if DATABASE_URL:
             try:
@@ -118,16 +109,15 @@ def connect_db():
                     connect_args={'connect_timeout': 10}
                 )
                 with db_engine.connect() as connection:
-                    logger.info("Database connection successful.")
+                    logging.info("Database connection successful.")
                 return db_engine
             except Exception as e:
-                logger.error(f"Failed to create database engine or connect: {e}", exc_info=True)
+                logging.error(f"Failed to create database engine or connect: {e}", exc_info=True)
                 db_engine = None
                 return None
         else:
-             logger.error("Could not determine database connection string.")
-             return None
-
+            logging.error("Could not determine database connection string.")
+            return None
     return db_engine
 
 
