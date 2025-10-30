@@ -83,8 +83,8 @@ def handle_evaluate():
              raise ValueError("prediction_start_time_iso must be a non-empty string")
         # Validate time format loosely (detailed validation in logic)
         try:
-             # Try parsing to catch obvious format errors early
-             temp_dt = datetime.fromisoformat(start_time_iso.replace('Z', '+00:00'))
+             # Try parsing the naive datetime string (e.g., "2025-10-30T08:45")
+             temp_dt = datetime.fromisoformat(start_time_iso)
         except ValueError:
              raise ValueError("prediction_start_time_iso format invalid (Expected ISO 8601 UTC: YYYY-MM-DDTHH:MM:SSZ)")
 

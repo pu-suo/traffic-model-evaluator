@@ -10,6 +10,7 @@ import json
 import os
 import logging
 import math
+from zoneinfo import ZoneInfo
 
 # --- Configuration ---
 SECRET_NAME_DB_CREDS = "HereTrafficDbCredentials" # Must match name used in AWS setup
@@ -176,6 +177,14 @@ def predict_arima(series, horizon_steps, order=DEFAULT_ARIMA_ORDER):
 def evaluate_forecast(prediction_start_time_iso, horizon_minutes, lookback_minutes, model_type):
     """Fetches data for ALL sensors, runs model, compares, returns results."""
     logger.info(f"Starting evaluation: start={prediction_start_time_iso}, horizon={horizon_minutes}, lookback={lookback_minutes}, model={model_type}")
+    try:
+        # This is the timezone of the user's web browser input
+        USER_TIMEZONE = ZoneInfo("America/Los_Angeles") 
+        # This is the timezone of your database
+        UTC_TIMEZONE = ZoneInfo("UTC") 
+    except Exception:
+        logger.critical("zoneinfo library failed. Is Python >= 3.9? Install 'tzdata' package if needed.")
+        return {"error": "CRITICAL: Server timezone configuration error."}
     engine = connect_db()
     if engine is None:
         logger.error("Evaluation failed: Database connection error.")
@@ -183,10 +192,15 @@ def evaluate_forecast(prediction_start_time_iso, horizon_minutes, lookback_minut
 
     try:
         # --- Time Window Calculation ---
-        try: # Parse start time, ensure UTC
-             prediction_start_time_utc = datetime.fromisoformat(prediction_start_time_iso.replace('Z', '+00:00'))
-             if prediction_start_time_utc.tzinfo is None:
-                 prediction_start_time_utc = prediction_start_time_utc.replace(tzinfo=timezone.utc)
+        try: 
+            # 1. Parse the naive datetime string (e.g., "2025-10-30T08:45")
+            naive_dt = datetime.fromisoformat(prediction_start_time_iso)
+
+            # 2. Localize the naive datetime, assuming it is in PST
+            local_dt = naive_dt.replace(tzinfo=USER_TIMEZONE)
+
+            # 3. Convert the localized PST datetime to UTC for the query
+            prediction_start_time_utc = local_dt.astimezone(UTC_TIMEZONE)
         except ValueError:
              return {"error": f"Invalid prediction_start_time format: {prediction_start_time_iso}. Use ISO 8601 UTC."}
 

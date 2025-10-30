@@ -169,9 +169,8 @@
 
             // Construct payload WITHOUT sensor_ids
             const payload = {
-                prediction_start_time_iso: startTimeToSend + ":00Z", // Add seconds and Z to make it valid ISO *if* backend needs full ISO UTC
-                // OR send exactly as startTimeLocal if backend expects local string and localizes itself. Let's assume backend localizes.
-                // prediction_start_time_iso: startTimeLocal,
+                // Send the naive local time string directly, e.g., "2025-10-30T08:45"
+                prediction_start_time_iso: startTimeLocal,
                 lookback_minutes: lookback,
                 horizon_minutes: horizon,
                 model_type: model
