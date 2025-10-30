@@ -82,6 +82,7 @@ collector/*.log
 *.pth
 *.pt
 *.npz
+*.json
 
 # Explicitly ignore mapping outputs and sensitive inputs
 mapping/*.csv
@@ -102,5 +103,6 @@ collector/*.csv
 terraform.tfstate*
 *.tfvars
 .aws/
+*.pem
 
 
