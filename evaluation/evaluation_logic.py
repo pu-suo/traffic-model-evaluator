@@ -14,7 +14,7 @@ import math
 # --- Configuration ---
 SECRET_NAME_DB_CREDS = "HereTrafficDbCredentials" # Must match name used in AWS setup
 # Attempt to get region from standard environment variables, fallback if needed
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-2"))
+AWS_REGION = "us-east-2"
 DEFAULT_ARIMA_ORDER = (1, 1, 0) # Default (p,d,q) order for ARIMA
 DATA_FREQUENCY = '5min' # Expected frequency of data in the database
 COLLECTION_INTERVAL_MINUTES = 5

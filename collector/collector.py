@@ -15,7 +15,7 @@ import math
 # *** USE CORRECT SECRET NAMES ***
 SECRET_NAME_HERE_API = "HereTrafficApiKey"
 SECRET_NAME_DB_CREDS = "HereTrafficDbCredentials"
-AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", os.environ.get("AWS_REGION", "us-east-2"))
+AWS_REGION = "us-east-2"
 
 MAPPING_FILE_PATH = 'pems_here_mapping.csv'
 HERE_FLOW_URL = "https://data.traffic.hereapi.com/v7/flow"
