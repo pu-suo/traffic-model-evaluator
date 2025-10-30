@@ -28,42 +28,6 @@ logger = logging.getLogger(__name__)
 db_engine = None
 secrets_cache = {}
 
-# --- AWS Secrets Manager ---
-def get_secret(secret_name, region_name=AWS_REGION):
-    """Retrieves secret value from AWS Secrets Manager, with caching."""
-    if secret_name in secrets_cache:
-        logger.debug(f"Using cached secret for: {secret_name}")
-        return secrets_cache[secret_name]
-
-    logger.info(f"Attempting to retrieve secret: {secret_name} from region {region_name}")
-    session = boto3.session.Session(region_name=region_name)
-    client = session.client(service_name='secretsmanager')
-
-    try:
-        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-        logger.info(f"Successfully retrieved secret: {secret_name}")
-
-        if 'SecretString' in get_secret_value_response:
-            secret = get_secret_value_response['SecretString']
-            try: # Try parsing as JSON
-                parsed_secret = json.loads(secret)
-                secrets_cache[secret_name] = parsed_secret
-                return parsed_secret
-            except json.JSONDecodeError: # Fallback to plain string
-                secrets_cache[secret_name] = secret
-                return secret
-        else:
-            logger.warning(f"Secret '{secret_name}' retrieved but might be binary format.")
-            return None
-
-    except client.exceptions.ResourceNotFoundException:
-        logger.error(f"Secret '{secret_name}' not found in AWS Secrets Manager region {region_name}.")
-        return None
-    except Exception as e:
-        logger.error(f"Failed to retrieve secret '{secret_name}' from AWS SM: {e}", exc_info=False)
-        return None
-
-# --- Database Connection ---
 # --- Database Connection ---
 def connect_db():
     """Establishes or verifies the database connection using SQLAlchemy."""
