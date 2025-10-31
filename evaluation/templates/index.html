@@ -5,28 +5,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Traffic Forecast Evaluation</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
 </head>
 <body>
 
-    <h1>Traffic Forecast Evaluation (MVP)</h1>
-    <p>Select parameters to evaluate a forecasting model against historical data collected from the HERE API. Evaluation is performed for all available sensors.</p>
+    <h1>Traffic Forecast Evaluation Dashboard</h1>
+    <p>Select parameters to evaluate a forecasting model against historical data.
+    Evaluation is performed for all available sensors for the *single* future time step requested.</p>
 
     <form id="evalForm">
         <div>
-            <label for="prediction_start_time">Prediction Start Time (Local):</label>
-            <input type="datetime-local" id="prediction_start_time" name="prediction_start_time" required step="300"> <small>Your local time. Will be converted to UTC for processing.</small>
+            <label for="prediction_start_time">Prediction Start Time (PST):</label>
+            <input type="datetime-local" id="prediction_start_time" name="prediction_start_time" required step="300">
+            <small>Your local time (assumed to be PST). Will be converted to UTC for processing.</small>
         </div>
 
         <div>
             <label for="lookback_minutes">Lookback Period (minutes):</label>
             <input type="number" id="lookback_minutes" name="lookback_minutes" value="60" min="15" max="10080" step="5" required>
-            <small>Range: 15 - 10080 (7 days)</small>
+            <small>Range: 15 - 10080 (7 days). ARIMA needs at least 50 mins.</small>
         </div>
 
         <div>
             <label for="horizon_minutes">Prediction Horizon (minutes):</label>
-            <input type="number" id="horizon_minutes" name="horizon_minutes" value="30" min="5" max="180" step="5" required>
-            <small>Range: 5 - 180 (3 hours)</small>
+            <input type="number" id="horizon_minutes" name="horizon_minutes" value="15" min="5" max="180" step="5" required>
+            <small>The *single* future timestamp to predict (e.g., 15 minutes out). Range: 5 - 180.</small>
         </div>
 
         <div>
@@ -34,26 +39,36 @@
             <select id="model_type" name="model_type" required>
                 <option value="HA">Historical Average (HA)</option>
                 <option value="ARIMA">ARIMA</option>
-                </select>
+            </select>
         </div>
 
         <button type="submit">Evaluate Model</button>
     </form>
 
     <div id="loading">Evaluating... Please wait. This may take a minute.</div>
+    
     <div id="results">
         <h2>Results</h2>
         <div id="resultsContent"><p>Enter parameters above and click "Evaluate Model".</p></div>
+        
+        <div id="mapContainer"></div>
+        <div id="tableContainer"></div>
     </div>
 
     <script>
         const form = document.getElementById('evalForm');
         const resultsContentDiv = document.getElementById('resultsContent');
         const loadingDiv = document.getElementById('loading');
+        // --- NEW: Get new containers ---
+        const mapContainer = document.getElementById('mapContainer');
+        const tableContainer = document.getElementById('tableContainer');
 
-        // --- Helper Function to Format Results ---
+        // --- Helper Function to Format Results (COMPLETELY REWRITTEN) ---
         function displayResults(resultData) {
-            resultsContentDiv.innerHTML = ''; // Clear previous
+            // Clear all previous results
+            resultsContentDiv.innerHTML = '';
+            mapContainer.innerHTML = '';
+            tableContainer.innerHTML = '';
 
             if (!resultData || typeof resultData !== 'object') {
                  resultsContentDiv.innerHTML = '<p class="error">Invalid response format received from server.</p>';
@@ -64,7 +79,7 @@
                  return;
             }
 
-            // --- Display Overall Metrics ---
+            // --- 1. Display Overall Metrics ---
             const overall = resultData.overall_metrics;
             let overallHtml = '<h3>Overall Metrics</h3>';
             if (overall && overall.total_points_compared > 0) {
@@ -77,68 +92,75 @@
             } else {
                 overallHtml += '<p>N/A (No comparable points found across sensors or calculation failed)</p>';
             }
-            resultsContentDiv.innerHTML += overallHtml;
+            resultsContentDiv.innerHTML = overallHtml; // Put this in the main results div
 
-            // --- Display Per-Sensor Details (Optional - could be a lot) ---
-            const perSensor = resultData.per_sensor_results;
-            let sensorHtml = '<h3>Per-Sensor Metrics (Top 20)</h3>'; // Limit display initially
-            let sensorCount = 0;
-            if (perSensor) {
-                sensorHtml += '<div class="sensor-details-container">';
-                for (const sensorId in perSensor) {
-                    if (sensorCount >= 20) {
-                         sensorHtml += '<p><i>... (results for remaining sensors hidden) ...</i></p>';
-                         break; // Stop after 20 sensors for brevity
-                    }
-                    if (perSensor.hasOwnProperty(sensorId)) {
-                        const data = perSensor[sensorId];
-                        const metrics = data.metrics;
-                        sensorHtml += `<div class="sensor-result"><h4>Sensor: ${sensorId}</h4>`;
-                        if (metrics && metrics.count > 0) {
-                            sensorHtml += `<p class="metrics">
-                                MAE: ${metrics.mae !== null ? metrics.mae.toFixed(2) : 'N/A'} |
-                                RMSE: ${metrics.rmse !== null ? metrics.rmse.toFixed(2) : 'N/A'} |
-                                Bias: ${metrics.bias !== null ? metrics.bias.toFixed(2) : 'N/A'}
-                                (Points: ${metrics.count})
-                            </p>`;
-                        } else {
-                            sensorHtml += `<p class="metrics">Metrics: N/A</p>`;
-                        }
-                        // Optionally add expandable sections for prediction/truth lists
-                        sensorHtml += `</div>`;
-                        sensorCount++;
-                    }
+            // --- 2. Display Maps ---
+            if (resultData.maps) {
+                mapContainer.innerHTML = '<h3>Geospatial Results</h3>';
+                if (resultData.maps.predicted) {
+                    mapContainer.innerHTML += resultData.maps.predicted;
                 }
-                 sensorHtml += '</div>'; // End container
-            } else {
-                 sensorHtml += '<p>No per-sensor results available.</p>';
+                if (resultData.maps.actual) {
+                    mapContainer.innerHTML += resultData.maps.actual;
+                }
             }
-             resultsContentDiv.innerHTML += sensorHtml;
+            
+            // --- 3. Display Per-Sensor Table ---
+            const perSensor = resultData.per_sensor_results;
+            let tableHtml = '<h3>All Sensor Results</h3>';
+            if (perSensor) {
+                tableHtml += '<div class="sensor-details-container">'; // Make it scrollable
+                tableHtml += '<table style="width: 100%; border-collapse: collapse;">';
+                tableHtml += `
+                    <thead style="position: sticky; top: 0; background-color: #f1f1f1;">
+                        <tr>
+                            <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Sensor ID</th>
+                            <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Prediction (mph)</th>
+                            <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Actual (mph)</th>
+                            <th style="padding: 8px; border-bottom: 1px solid #ddd; text-align: left;">Bias (mph)</th>
+                        </tr>
+                    </thead>`;
+                tableHtml += '<tbody>';
+                
+                // Sort sensors by ID
+                const sortedSensorIds = Object.keys(perSensor).sort();
 
-             // Optionally add raw JSON output
-             // resultsContentDiv.innerHTML += '<h3>Raw JSON Response</h3>';
-             // resultsContentDiv.innerHTML += `<pre>${JSON.stringify(resultData, null, 2)}</pre>`;
+                for (const sensorId of sortedSensorIds) {
+                    const data = perSensor[sensorId];
+                    const pred = data.prediction !== null ? data.prediction.toFixed(2) : 'N/A';
+                    const actual = data.actual !== null ? data.actual.toFixed(2) : 'N/A';
+                    const bias = data.bias !== null ? data.bias.toFixed(2) : 'N/A';
+                    
+                    tableHtml += `
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #ddd;">${sensorId}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #ddd;">${pred}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #ddd;">${actual}</td>
+                            <td style="padding: 8px; border-bottom: 1px solid #ddd;">${bias}</td>
+                        </tr>`;
+                }
+                tableHtml += '</tbody></table></div>';
+                tableContainer.innerHTML = tableHtml;
+            } else {
+                 tableContainer.innerHTML = '<p>No per-sensor results available.</p>';
+            }
         }
 
 
-        // --- Set Default Start Time ---
+        // --- Set Default Start Time (Unchanged) ---
         function setDefaultTime() {
             const now = new Date();
-            // Go back 1 hour and floor to the nearest 5-minute interval
             const oneHourAgo = new Date(now.getTime() - (60 * 60 * 1000));
             const minutesRemainder = oneHourAgo.getMinutes() % 5;
             oneHourAgo.setMinutes(oneHourAgo.getMinutes() - minutesRemainder);
             oneHourAgo.setSeconds(0);
             oneHourAgo.setMilliseconds(0);
-
-            // Format for datetime-local input (YYYY-MM-DDTHH:MM) - Needs local time
             const year = oneHourAgo.getFullYear();
             const month = (oneHourAgo.getMonth() + 1).toString().padStart(2, '0');
             const day = oneHourAgo.getDate().toString().padStart(2, '0');
             const hours = oneHourAgo.getHours().toString().padStart(2, '0');
             const minutes = oneHourAgo.getMinutes().toString().padStart(2, '0');
             const localTimeString = `${year}-${month}-${day}T${hours}:${minutes}`;
-
             const startTimeInput = document.getElementById('prediction_start_time');
             if (startTimeInput) {
                 startTimeInput.value = localTimeString;
@@ -148,36 +170,29 @@
             }
         }
 
-        // --- Form Submission Handler ---
+        // --- Form Submission Handler (MODIFIED) ---
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
+            // Clear all results and show loading
             resultsContentDiv.innerHTML = '<p>Processing request...</p>';
+            mapContainer.innerHTML = '';
+            tableContainer.innerHTML = '';
             loadingDiv.style.display = 'block';
 
             const formData = new FormData(form);
-            const startTimeLocal = formData.get('prediction_start_time'); // "YYYY-MM-DDTHH:MM" (local)
+            const startTimeLocal = formData.get('prediction_start_time'); // "YYYY-MM-DDTHH:MM"
             const lookback = parseInt(formData.get('lookback_minutes'), 10);
             const horizon = parseInt(formData.get('horizon_minutes'), 10);
             const model = formData.get('model_type');
 
-            // Convert local datetime-local to ISO UTC string (YYYY-MM-DDTHH:MM:SSZ)
-            // It's crucial the backend expects UTC if JS converts it here.
-            // If backend converts from local, just send startTimeLocal.
-            // Let's assume backend converts from local string, so send as is but maybe add Z? No, backend expects local.
-            // ****** ADJUSTMENT: Send the local time string directly, let backend handle localization ******
-             const startTimeToSend = startTimeLocal; // Send the string "YYYY-MM-DDTHH:MM"
-
-            // Construct payload WITHOUT sensor_ids
+            // --- MODIFIED: Send the naive local time string directly ---
             const payload = {
-                // Send the naive local time string directly, e.g., "2025-10-30T08:45"
-                prediction_start_time_iso: startTimeLocal,
+                prediction_start_time_iso: startTimeLocal, // e.g., "2025-10-30T14:05"
                 lookback_minutes: lookback,
                 horizon_minutes: horizon,
                 model_type: model
-                // NO sensor_ids here
             };
             console.log("Sending payload:", payload);
-
 
             try {
                 const response = await fetch('/evaluate', {
@@ -190,7 +205,7 @@
                 console.log("Received response:", result);
 
                 loadingDiv.style.display = 'none';
-                displayResults(result); // Call helper to render results
+                displayResults(result); // Call helper to render all new components
 
             } catch (error) {
                 loadingDiv.style.display = 'none';
@@ -201,7 +216,6 @@
 
         // Set default time when the page loads
         document.addEventListener('DOMContentLoaded', setDefaultTime);
-
     </script>
 
 </body>

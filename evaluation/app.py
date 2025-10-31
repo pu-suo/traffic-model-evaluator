@@ -7,7 +7,7 @@ import time
 
 # Import the core logic function
 try:
-    from .evaluation_logic import evaluate_forecast, connect_db
+    from .evaluation_logic import evaluate_forecast, connect_db, load_sensor_locations
 except ImportError as e:
     logging.critical(f"Could not import evaluation_logic: {e}. Ensure evaluation_logic.py is in the same directory.")
     # Define dummy functions if import fails to allow Flask to start
@@ -15,6 +15,9 @@ except ImportError as e:
         return {"error": "CRITICAL: Evaluation logic module failed to import. Check server logs."}
     def connect_db():
         logging.error("CRITICAL: connect_db function not loaded.")
+        return None
+    def load_sensor_locations():
+        logging.error("CRITICAL: load_sensor_locations function not loaded.")
         return None
 
 # --- Flask App Setup ---
@@ -29,14 +32,21 @@ else: # When run directly (flask run)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)-8s] %(message)s')
     app.logger.setLevel(logging.INFO)
 
-# Try initial DB connection check on startup (optional)
-# Using app_context ensures Flask context is available if needed by connect_db
+# Try initial DB connection check and load mapping on startup
 with app.app_context():
      engine = connect_db()
      if engine is None:
          app.logger.error("Initial DB connection failed on Flask app startup. Evaluation endpoint WILL fail.")
      else:
           app.logger.info("Flask app startup: DB connection check successful.")
+     
+     # --- ADD THIS BLOCK TO LOAD SENSOR LOCATIONS ---
+     try:
+         load_sensor_locations()
+         app.logger.info("Successfully loaded sensor locations from mapping file.")
+     except Exception as e:
+         app.logger.critical(f"CRITICAL: Failed to load sensor locations on startup: {e}", exc_info=True)
+     # --- END ADD ---
 
 
 # --- Routes ---
@@ -44,8 +54,6 @@ with app.app_context():
 def index():
     """Serves the basic HTML form for submitting evaluation requests."""
     app.logger.info("Serving index.html")
-    # You could pass default values to the template here if desired
-    # e.g., default_start_time = ...
     return render_template('index.html')
 
 @app.route('/evaluate', methods=['POST'])
@@ -81,17 +89,16 @@ def handle_evaluate():
         # Basic type/value range validation
         if not isinstance(start_time_iso, str) or not start_time_iso:
              raise ValueError("prediction_start_time_iso must be a non-empty string")
-        # Validate time format loosely (detailed validation in logic)
+        # Validate time format loosely
         try:
-             # Try parsing the naive datetime string (e.g., "2025-10-30T08:45")
              temp_dt = datetime.fromisoformat(start_time_iso)
         except ValueError:
-             raise ValueError("prediction_start_time_iso format invalid (Expected ISO 8601 UTC: YYYY-MM-DDTHH:MM:SSZ)")
+             raise ValueError("prediction_start_time_iso format invalid (Expected YYYY-MM-DDTHH:MM)")
 
         # Sensible limits for horizon and lookback
         if not (5 <= horizon <= 180 and horizon % 5 == 0): # e.g., 5 mins to 3 hours, multiple of 5
              raise ValueError("horizon_minutes must be between 5 and 180, and a multiple of 5")
-        if not (15 <= lookback <= 10080): # e.g., 15 mins to 7 days
+        if not (15 <= lookback <= 9900): # e.g., 15 mins to 7 days
              raise ValueError("lookback_minutes must be between 15 and 10080")
         if not isinstance(model, str) or model.upper() not in ['HA', 'ARIMA']:
              raise ValueError("model_type must be 'HA' or 'ARIMA'")
@@ -114,7 +121,7 @@ def handle_evaluate():
         if isinstance(results, dict) and 'error' in results:
              # Log the specific error from the logic function
              app.logger.error(f"Evaluation logic failed: {results['error']}")
-             # Determine appropriate status code based on error type
+             # Determine appropriate status code
              status_code = 500 if "Database" in results.get("error","") or "critical" in results.get("error","").lower() else 400
              return jsonify(results), status_code
 
@@ -129,8 +136,5 @@ def handle_evaluate():
 
 # --- Main Execution Block (for `flask run`) ---
 if __name__ == '__main__':
-    # Use 0.0.0.0 to be accessible on network, port 80 standard HTTP
-    # Debug=False is crucial for production/deployment testing
-    # Use waitress or gunicorn instead of Flask's built-in server for anything beyond basic testing
     app.logger.info("Starting Flask development server...")
     app.run(host='0.0.0.0', port=80, debug=False)
