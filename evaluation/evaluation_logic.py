@@ -316,7 +316,8 @@ def evaluate_forecast(prediction_start_time_iso, horizon_minutes, lookback_minut
             if not eval_comparison_df.empty:
                 try:
                     mae = mean_absolute_error(eval_comparison_df['actual_speed'], eval_comparison_df['predicted_speed'])
-                    rmse = mean_squared_error(eval_comparison_df['actual_speed'], eval_comparison_df['predicted_speed'], squared=False)
+                    mse = mean_squared_error(eval_comparison_df['actual_speed'], eval_comparison_df['predicted_speed'])
+                    rmse = np.sqrt(mse)
                     bias = (eval_comparison_df['predicted_speed'] - eval_comparison_df['actual_speed']).mean()
                     count = len(eval_comparison_df)
                 except Exception as metric_e:
